@@ -1,0 +1,46 @@
+# Based on the upstream OpenMRS reference distribution service layout.
+# https://github.com/openmrs/openmrs-distro-referenceapplication
+# Run with a distinct project name per facility; volumes remain isolated.
+services:
+  gateway:
+    image: openmrs/openmrs-reference-application-3-gateway:3.8.0
+    depends_on: [frontend, backend]
+    ports: ["127.0.0.1:${EMR_PORT:-18081}:80"]
+  frontend:
+    image: openmrs/openmrs-reference-application-3-frontend:3.8.0
+    environment:
+      SPA_PATH: /openmrs/spa
+      API_URL: /openmrs
+      SPA_CONFIG_URLS: /openmrs/spa/config-core_demo.json
+    depends_on: [backend]
+  backend:
+    image: openmrs/openmrs-reference-application-3-backend:3.8.0
+    environment:
+      OMRS_CONFIG_MODULE_WEB_ADMIN: "true"
+      OMRS_CONFIG_AUTO_UPDATE_DATABASE: "true"
+      OMRS_CONFIG_CREATE_TABLES: "true"
+      OMRS_CONFIG_CONNECTION_SERVER: db
+      OMRS_CONFIG_CONNECTION_DATABASE: openmrs
+      OMRS_CONFIG_CONNECTION_USERNAME: openmrs
+      OMRS_CONFIG_CONNECTION_PASSWORD: ${POSTGRES_PASSWORD:?Local database password required}
+      JAVA_OPTS: -Xms512m -Xmx3g
+    depends_on:
+      db: { condition: service_healthy }
+    volumes: ["openmrs-data:/openmrs/data"]
+  db:
+    image: mariadb:10.11.7
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_general_ci"]
+    environment:
+      MYSQL_DATABASE: openmrs
+      MYSQL_USER: openmrs
+      MYSQL_PASSWORD: ${POSTGRES_PASSWORD:?Local database password required}
+      MYSQL_ROOT_PASSWORD: ${POSTGRES_PASSWORD:?Local database password required}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes: ["db-data:/var/lib/mysql"]
+volumes:
+  openmrs-data:
+  db-data:

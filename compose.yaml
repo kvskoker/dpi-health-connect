@@ -1,0 +1,39 @@
+name: dpi-h-hackathon
+services:
+  core:
+    build: .
+    ports: ["127.0.0.1:4310:4300"]
+    environment:
+      DATABASE_URL: postgres://dpi:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/dpi
+      API_TOKEN: ${API_TOKEN:?Set API_TOKEN}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      META_MODEL: ${META_MODEL:-muse-spark-1.3}
+      META_BASE_URL: ${META_BASE_URL:-https://api.meta.ai/v1}
+      FHIR_BASE_URL: ${FHIR_BASE_URL:-}
+      FHIR_BEARER_TOKEN: ${FHIR_BEARER_TOKEN:-}
+      OPENMRS_BASE_URL: ${DOCKER_OPENMRS_BASE_URL:-}
+      OPENMRS_USERNAME: ${OPENMRS_USERNAME:-}
+      OPENMRS_PASSWORD: ${OPENMRS_PASSWORD:-}
+      OPENMRS_IDENTIFIER_TYPE: ${OPENMRS_IDENTIFIER_TYPE:-}
+      OPENMRS_LOCATION: ${OPENMRS_LOCATION:-}
+      OPENMRS_SYSTOLIC_CONCEPT: ${OPENMRS_SYSTOLIC_CONCEPT:-}
+      OPENMRS_DIASTOLIC_CONCEPT: ${OPENMRS_DIASTOLIC_CONCEPT:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dpi
+      POSTGRES_DB: dpi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - dpi-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dpi -d dpi"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  dpi-postgres:

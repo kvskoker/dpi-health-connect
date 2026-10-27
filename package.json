@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:integration": "node --env-file=.env --import tsx scripts/integration.ts",
-    "demo": "node --env-file=.env --import tsx scripts/demo.ts"
+    "demo": "node --env-file=.env --import tsx scripts/demo.ts",
+    "check:public": "node scripts/check-public.mjs"
   },
   "dependencies": {
     "fastify": "^5.12.7",
@@ -23,5 +24,6 @@
     "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
-  }
+  },
+  "license": "MIT"
 }

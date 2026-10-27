@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import pg from 'pg';
+import { Store } from '../src/store.js';
+import { Referrals } from '../src/referrals.js';
+import { mappingV1, sampleV1, expected } from '../src/fixtures.js';
+const schema = `test_referral_${randomUUID().replaceAll('-', '')}`;
+const admin = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+await admin.query(`CREATE SCHEMA ${schema}`);
+const url = new URL(process.env.DATABASE_URL!); url.searchParams.set('options', `-csearch_path=${schema}`);
+const store = new Store(url.href), referrals = new Referrals(store);
+try {
+  await store.init(); await referrals.init();
+  const mapping = await store.saveMapping(mappingV1);
+  const check = await store.validate(mapping.id, [{ input: sampleV1, expected }]);
+  await store.approve(mapping.id, check.validationId, 'test');
+  const { event } = await store.ingest({ source: 'community-simulator', sourceEventId: 'test', sourceVersion: '1', payload: sampleV1, mappingId: mapping.id });
+  const input = { requestId: 'test-referral', eventId: event.id, reason: 'Synthetic referral workflow test', urgency: 'urgent', actor: 'QA' };
+  await assert.rejects(referrals.create(input), /PHU delivery/);
+  // Explicit test adapter: real OpenMRS proof is in hospital-demo.ts.
+  await store.deliver('http://test.invalid', undefined, async () => ({ kind: 'openmrs-rest' }));
+  const copies = await Promise.all(Array.from({ length: 5 }, () => referrals.create(input)));
+  assert.equal(new Set(copies.map(r => r.id)).size, 1);
+  const id = copies[0].id;
+  await assert.rejects(referrals.create({ ...input, reason: 'Conflicting synthetic reason' }), /different content/);
+  await assert.rejects(referrals.transition(id, 'accepted', 'QA', 'Premature acceptance'), /delivered/);
+  await referrals.deliver(async () => { throw new Error('Simulated hospital outage'); });
+  let row = (await store.pool.query('SELECT * FROM referrals WHERE id=$1', [id])).rows[0];
+  assert.equal(row.status, 'queued'); assert.equal(row.attempts, 1); assert.match(row.error, /outage/);
+  assert.ok(Date.parse(row.next_attempt) > Date.now() - 500);
+  const receiver = new Set<string>();
+  await store.pool.query('UPDATE referrals SET next_attempt=now() WHERE id=$1', [id]);
+  await referrals.deliver(async (_bundle, referral) => { receiver.add(referral.id); throw new Error('Simulated lost response after write'); });
+  await store.pool.query('UPDATE referrals SET next_attempt=now() WHERE id=$1', [id]);
+  const reopened = new Referrals(store); await reopened.init();
+  await Promise.all([reopened.deliver(async (_bundle, referral) => { receiver.add(referral.id); return { referralReadbackVerified: true }; }), reopened.deliver(async () => { throw new Error('Must not concurrently deliver the same referral'); })]);
+  row = (await store.pool.query('SELECT * FROM referrals WHERE id=$1', [id])).rows[0];
+  assert.equal(row.status, 'delivered'); assert.equal(receiver.size, 1);
+  await assert.rejects(referrals.transition(id, 'completed', 'QA', 'Skip acceptance'), /accepted/);
+  await referrals.transition(id, 'accepted', 'QA', 'Test acceptance');
+  await referrals.transition(id, 'completed', 'QA', 'Test completion');
+  await assert.rejects(referrals.transition(id, 'accepted', 'QA', 'Regress status'), /delivered/);
+  console.log('PASS: PHU prerequisite, concurrent duplicate protection, conflicts, outage retry, response-loss recovery, worker locking and ordered referral transitions. Test adapter only.');
+} finally { await store.pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end(); }

@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "matchingType": "deterministic",
+      "fields": {
+        "given": {
+          "algorithm": "exact",
+          "fhirpath": "name.where(use='official').given",
+          "espath": "given",
+          "null_handling": "conservative",
+          "null_handling_both": "conservative"
+        }
+      },
+      "potentialMatchThreshold": 1,
+      "autoMatchThreshold": 2,
+      "filters": {}
+    }
+  ]
+}

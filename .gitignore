@@ -9,3 +9,15 @@ coverage/
 __pycache__/
 data/
 secrets/
+# Local run evidence may contain receiver identifiers, screenshots or session details.
+evidence/*
+!evidence/README.md
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.sql
+*.dump
+*.bak

@@ -1,44 +1,46 @@
 # DPI Health Connect
 
-Hackathon workspace created 26 October 2026. Status: the first connector backend is implemented and tested. OpenMRS deployments are being initialized; real EMR delivery and live Meta inference must be verified separately before being claimed complete.
+An interoperability proof of concept for Sierra Leone: connect community and facility systems through an HIE, link patient identity, preserve a longitudinal record, and use Meta models to propose repairs when message formats change.
 
-Kenneth confirmed the direction on 26 October: build on existing open-source technologies to make health interoperability easier to set up and deploy, with AI-assisted integration maintenance as the distinguishing feature.
+## Implemented
 
-ComEMR 3.0.0 remains private and external to this repository. The public judging setup will use an independently implemented community API simulator. A configurable connector will also target Kenneth's local Docker deployment of ComEMR. Compatibility claims will be limited to the endpoints and behaviors verified by shared contract tests; no private ComEMR source or container image is included.
+- Independent synthetic community assessment API and constrained blood-pressure mappings.
+- Separate PHU and hospital OpenMRS deployments, verified API delivery and referral feedback.
+- OpenCR Client Registry and a separate HAPI FHIR Shared Health Record.
+- Optional connector to a locally available ComEMR deployment: follow-up delivery and completion readback.
+- Muse Spark mapping proposals, deterministic validation, explicit reviewer approval, audit records and duplicate-safe replay.
+- Local workbench with assessment repair, connections, exchange monitoring, referrals, shared records and interactive completion repair.
 
-Build a working interoperability proof for Sierra Leone: a community assessment follows Aminata through a PHU and hospital, using shared identity and a longitudinal record. A Meta-powered mapping assistant helps onboard changing application formats through reviewed, validated mappings.
+The completion-repair rehearsal deliberately changes a test message envelope; it does not modify ComEMR's actual API. Model proposals do not make clinical decisions. The six-week appointment and the completed integration-rehearsal visit are separate records.
 
-## Project documents
+## Run and test
 
-- [Run the implementation](docs/RUNNING.md): local API, Docker services, tests, repeatable scenario and current limitations.
+Node.js 22 or later, Docker Compose and PowerShell are used by the local setup. Copy `.env.example` to `.env` and configure fresh local credentials. Never commit `.env`.
 
-- [Build plan](docs/BUILD-PLAN.md): scope, architecture, implementation sequence, acceptance tests and demonstration.
-- [Rules and submission checklist](docs/RULES-AND-SUBMISSION.md): verified requirements, unresolved participant rules, evidence and submission tasks.
-- [Delivery backlog](docs/BACKLOG.md): ordered work with measurable completion criteria.
-
-The DPI-H workshop established an architectural blueprint and patient journey through a concept demo in `../dpi-h-journey-demo`. It captured no real patient data in ComEMR and implemented no exchange with another application. It provides problem context and design reference for the hackathon. The new contribution is the functioning interoperability implementation and its evaluation. Record any reused presentation assets or code separately from new development, in accordance with organizer rules.
-
-## Implemented first increment
-
-The `src/` backend provides an independent synthetic assessment endpoint, constrained mappings, content-hash approvals tied to passing validation, PostgreSQL event/resource persistence, an outbox with retry, audit records and replay. Tests cover schema drift, invalid units, approval bypass, concurrent duplicate submission, payload conflicts, restart persistence and receiver failure. A real Meta proposal endpoint is implemented but requires a configured API key; it never substitutes a fake model response. The current repeatable repair demonstration uses a manually authored mapping and is labeled accordingly.
-
-This increment is a blood-pressure exchange slice. It is not yet the full registry, referral, longitudinal record or national dashboard stack. The first OpenMRS adapter is restricted to synthetic patient and BP observations; field compatibility with ComEMR is not yet established.
-
-## Planned repository structure
-
-```text
-apps/console/                 live journey, integration workbench and dashboards
-services/core/               HIE routing, registries, referral state and audit APIs
-services/worker/             reliable delivery, retries and aggregation
-packages/contracts/         event schemas, FHIR profiles and API contracts
-packages/connectors/        ComEMR, OpenMRS and DHIS2 adapters
-packages/meta/              model gateway and mapping assistant
-infra/                     containers and local configuration
-fixtures/                  synthetic patients, schemas and code systems
-evals/                     held-out mapping cases and scoring
-tests/                     integration, failure and browser tests
-evidence/                  measured runs and submission evidence
-docs/                      build plan and decisions
+```powershell
+npm ci
+npm run typecheck
+npm test
 ```
 
-Use synthetic patient data only. Configure credentials locally in ignored environment files; never place credentials in browser code, fixtures or model prompts.
+Follow [the running guide](docs/RUNNING.md) for services and metadata setup. Once the stack is running, `./Open-Workbench.ps1` opens the workbench at http://127.0.0.1:4310/.
+
+- [Registry and shared-record architecture](docs/REGISTRY-AND-SHR.md)
+- [ComEMR follow-up and interactive completion repair](docs/COMEMR-FOLLOWUP.md)
+- [Build plan](docs/BUILD-PLAN.md)
+- [Rules and submission checklist](docs/RULES-AND-SUBMISSION.md)
+- [Backlog](docs/BACKLOG.md)
+
+## Public project boundary
+
+This repository contains independently written hackathon code, test fixtures, deployment configuration and documentation. ComEMR 3.0.0 source, images and local databases are not included. The optional ComEMR connector requires separately authorized access. Its contract coverage is limited to the interfaces tested locally.
+
+The public synthetic assessment simulator is available without ComEMR. A full public simulator for ComEMR follow-up creation/completion has not yet been implemented, so that portion of the demonstration currently requires the private local installation. Local journey scripts also have ordered prerequisites and some reference recorded demo IDs; they are not yet a clean-clone, one-command judging setup.
+
+All demonstrations use synthetic data. Local credentials, certificates, linkage files, receiver evidence and screenshots are excluded from Git. Run `npm run check:public` before publishing; inspect the staged diff as well.
+
+The earlier DPI-H workshop was a concept demonstration and architectural blueprint. This repository is the functioning interoperability implementation begun in October 2026. It is a development proof of concept, not a production national health platform.
+
+## Licensing
+
+The original project code is offered under the [MIT License](LICENSE). Third-party systems and packages retain their own licenses; see [THIRD_PARTY.md](THIRD_PARTY.md). ComEMR is excluded from this grant.

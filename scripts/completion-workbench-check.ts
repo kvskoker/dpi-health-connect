@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+const base='http://127.0.0.1:4310';
+async function api(path:string,body?:unknown){const r=await fetch(base+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+process.env.API_TOKEN,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});const j:any=await r.json();if(!r.ok)throw new Error(j.error);return j;}
+const mapping=JSON.parse(readFileSync('evidence/meta-completion-repair.json','utf8')).mapping;
+const task=(await api('/completion-repairs/tasks'))[0];assert.ok(task);
+const job=await api('/completion-repairs',{taskId:task.task_id});
+await assert.rejects(api(`/completion-repairs/${job.id}/replay`,{mapping,validationId:job.id}),/approval/);
+let valid=await api(`/completion-repairs/${job.id}/validate`,{mapping});assert.ok(valid.validation.passed);
+const changed={...mapping,patientId:'person.memberKey'};
+await assert.rejects(api(`/completion-repairs/${job.id}/approve`,{mapping:changed,validationId:valid.validation_id,actor:'Workbench automated QA'}),/exact/);
+const failed=await api(`/completion-repairs/${job.id}/validate`,{mapping:changed});assert.equal(failed.validation.passed,false);
+await assert.rejects(api(`/completion-repairs/${job.id}/approve`,{mapping,validationId:valid.validation_id,actor:'Workbench automated QA'}));
+valid=await api(`/completion-repairs/${job.id}/validate`,{mapping});
+await api(`/completion-repairs/${job.id}/approve`,{mapping,validationId:valid.validation_id,actor:'Workbench automated QA'});
+await assert.rejects(api(`/completion-repairs/${job.id}/replay`,{mapping:changed,validationId:valid.validation_id}));
+const replay=await Promise.all([api(`/completion-repairs/${job.id}/replay`,{mapping,validationId:valid.validation_id}),api(`/completion-repairs/${job.id}/replay`,{mapping,validationId:valid.validation_id})]);
+assert.ok(replay.every(r=>r.state==='replayed'&&r.receipt.completionCount===1));
+await assert.rejects(api(`/completion-repairs/${job.id}/validate`,{mapping}),/cannot be changed/);
+writeFileSync('evidence/completion-workbench-check.json',JSON.stringify({timestamp:new Date().toISOString(),repairId:job.id,checks:['unapproved replay blocked','edited mapping approval blocked','failed validation revokes prior approval eligibility','stale validation blocked','edited replay blocked','concurrent replay duplicate-safe','replayed repair immutable'],receipt:replay[0].receipt},null,2));
+console.log('Completion workbench API gates passed; concurrent replay returned one completion.');

@@ -6,9 +6,12 @@ Kenneth owns product decisions, application access and final submission. Impleme
 
 - Implemented and verified: constrained BP mappings, validation-bound approval, independent simulator assessment endpoint, PostgreSQL persistence, audit, quarantine and replay.
 - Verified with a labeled HTTP test receiver: concurrent duplicate handling, payload conflicts, persisted restart, receiver outage and response-loss retries. These are engineering tests, not OpenMRS integration evidence.
-- Implemented but awaiting a live key: Meta mapping proposal endpoint. No live model result is claimed.
-- Running: isolated core/PostgreSQL Docker services; separate OpenMRS PHU/hospital projects are initializing. Real receiver write/readback verification remains pending.
-- Not yet implemented: full client/health registries, longitudinal FHIR store, demographics/referral workflow, multi-destination delivery, visual workbench and national indicators.
+- Verified with the real Meta API: Muse Spark 1.3 proposed a mapping for schema drift, passed two expected-output cases and missing-unit rejection, then replayed the quarantined event through a labeled automated approval test. Model evidence is saved in `evidence/meta-repair-run.json`. Review UI is implemented; broader evaluation and cumulative spend enforcement remain pending.
+- Running: isolated core/PostgreSQL Docker services; separate OpenMRS PHU/hospital projects are ready. Real PHU patient/BP write and readback passed, including linked identifier, values, units, time, facility and repeat delivery.
+- Implemented: local integration workbench with connection/schema registration, configured endpoint checks, real Meta proposal review, saved mapping reuse, explicit validation and reviewer approval, quarantine replay, delivery monitor and audit view. Browser verification passed the complete repair flow; real PHU receiver delivery is now verified.
+- Verified hospital increment: separate hospital patient/BP delivery and referral encounter/note readback; durable queue, idempotency, retry, audited operator acceptance/completion and Referrals workbench tab. Evidence: `evidence/hospital-referral-readback.json`.
+- Implemented registry/SHR increment: independent OpenCR identity service and HAPI FHIR clinical repository with separate databases, certificate-authenticated registry access, verified identifier links, FHIR resource synchronization and a shared-timeline tab. National deployment qualifications are in `REGISTRY-AND-SHR.md`.
+- Not yet implemented: national client matching/adjudication policy, health registries, full demographics, EMR referral initiation/status callbacks, general multi-destination routing, general connector generation and national indicators.
 
 | ID | Priority | Work | Done when |
 | --- | --- | --- | --- |

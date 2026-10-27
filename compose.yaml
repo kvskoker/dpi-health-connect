@@ -2,16 +2,40 @@ name: dpi-h-hackathon
 services:
   core:
     build: .
+    networks: [default, registry, shared-record]
+    volumes:
+      - ./secrets/opencr/client_key.pem:/run/opencr/client_key.pem:ro
+      - ./secrets/opencr/client_cert.pem:/run/opencr/client_cert.pem:ro
+      - ./secrets/opencr/server_cert.pem:/run/opencr/server_cert.pem:ro
     ports: ["127.0.0.1:4310:4300"]
     environment:
       DATABASE_URL: postgres://dpi:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/dpi
       API_TOKEN: ${API_TOKEN:?Set API_TOKEN}
+      COMEMR_BASE_URL: http://host.docker.internal:3000
+      COMEMR_USERNAME: ${COMEMR_USERNAME:-}
+      COMEMR_PASSWORD: ${COMEMR_PASSWORD:-}
+      COMEMR_CLIENT: ${COMEMR_CLIENT:-mob}
+      COMEMR_PASSWORD_HASH_KEY: ${COMEMR_PASSWORD_HASH_KEY:-spice_uat}
+      OPENCR_URL: https://opencr:3000/fhir
+      SHR_URL: http://shr-fhir:8080/fhir
       MODEL_API_KEY: ${MODEL_API_KEY:-}
       META_MODEL: ${META_MODEL:-muse-spark-1.3}
       META_BASE_URL: ${META_BASE_URL:-https://api.meta.ai/v1}
       FHIR_BASE_URL: ${FHIR_BASE_URL:-}
       FHIR_BEARER_TOKEN: ${FHIR_BEARER_TOKEN:-}
       OPENMRS_BASE_URL: ${DOCKER_OPENMRS_BASE_URL:-}
+      HOSPITAL_OPENMRS_BASE_URL: http://host.docker.internal:18082/openmrs/ws/rest/v1
+      HOSPITAL_OPENMRS_USERNAME: ${HOSPITAL_OPENMRS_USERNAME:-}
+      HOSPITAL_OPENMRS_PASSWORD: ${HOSPITAL_OPENMRS_PASSWORD:-}
+      HOSPITAL_OPENMRS_IDENTIFIER_TYPE: ${HOSPITAL_OPENMRS_IDENTIFIER_TYPE:-}
+      HOSPITAL_OPENMRS_LOCATION: ${HOSPITAL_OPENMRS_LOCATION:-}
+      HOSPITAL_OPENMRS_SYSTOLIC_CONCEPT: ${HOSPITAL_OPENMRS_SYSTOLIC_CONCEPT:-}
+      HOSPITAL_OPENMRS_DIASTOLIC_CONCEPT: ${HOSPITAL_OPENMRS_DIASTOLIC_CONCEPT:-}
+      HOSPITAL_OPENMRS_REFERRAL_ENCOUNTER_TYPE: ${HOSPITAL_OPENMRS_REFERRAL_ENCOUNTER_TYPE:-}
+      HOSPITAL_OPENMRS_REFERRAL_NOTE_CONCEPT: ${HOSPITAL_OPENMRS_REFERRAL_NOTE_CONCEPT:-}
+      OPENMRS_OUTCOME_CONCEPT: ${OPENMRS_OUTCOME_CONCEPT:-}
+      OPENMRS_FEEDBACK_ENCOUNTER_TYPE: ${OPENMRS_FEEDBACK_ENCOUNTER_TYPE:-}
+      HOSPITAL_OPENMRS_OUTCOME_CONCEPT: ${HOSPITAL_OPENMRS_OUTCOME_CONCEPT:-}
       OPENMRS_USERNAME: ${OPENMRS_USERNAME:-}
       OPENMRS_PASSWORD: ${OPENMRS_PASSWORD:-}
       OPENMRS_IDENTIFIER_TYPE: ${OPENMRS_IDENTIFIER_TYPE:-}
@@ -35,5 +59,73 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+  registry-db:
+    image: postgres:16-alpine
+    networks: [registry]
+    environment:
+      POSTGRES_USER: registry
+      POSTGRES_DB: registry
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [registry-db:/var/lib/postgresql/data]
+  registry-fhir:
+    image: hapiproject/hapi:v8.12.0-2
+    networks: [registry]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://registry-db:5432/registry
+      SPRING_DATASOURCE_USERNAME: registry
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_DRIVERCLASSNAME: org.postgresql.Driver
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+      JAVA_TOOL_OPTIONS: -Xmx1536m
+    depends_on: [registry-db]
+  registry-search:
+    image: intrahealth/opensearch:6b4c779
+    networks: [registry]
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: 'true'
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes: [registry-search:/usr/share/opensearch/data]
+  opencr:
+    image: intrahealth/opencr:bb06e1a
+    networks: [registry]
+    environment:
+      NODE_ENV: docker
+      HAPI_FHIR_URL: http://registry-fhir:8080/fhir/metadata
+    volumes:
+      - ./secrets/opencr/config.json:/src/server/config/config_docker.json
+      - ./secrets/opencr/server_key.pem:/src/server/serverCertificates/server_key.pem:ro
+      - ./secrets/opencr/server_cert.pem:/src/server/serverCertificates/server_cert.pem:ro
+      - ./infra/opencr-rules.json:/src/server/config/decisionRules.json:ro
+    depends_on: [registry-fhir, registry-search]
+    restart: on-failure
+  shr-db:
+    image: postgres:16-alpine
+    networks: [shared-record]
+    environment:
+      POSTGRES_USER: shr
+      POSTGRES_DB: shr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [shr-db:/var/lib/postgresql/data]
+  shr-fhir:
+    image: hapiproject/hapi:v8.12.0-2
+    networks: [shared-record]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://shr-db:5432/shr
+      SPRING_DATASOURCE_USERNAME: shr
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_DRIVERCLASSNAME: org.postgresql.Driver
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+      HAPI_FHIR_STORE_META_SOURCE_INFORMATION: SOURCE_URI
+      JAVA_TOOL_OPTIONS: -Xmx1536m
+    depends_on: [shr-db]
+networks:
+  registry:
+    internal: true
+  shared-record:
+    internal: true
 volumes:
   dpi-postgres:
+  registry-db:
+  registry-search:
+  shr-db:
